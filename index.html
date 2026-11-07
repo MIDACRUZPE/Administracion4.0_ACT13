@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Administracion4.0_ACT13 - Miniweb Interactiva Agéntica | Politécnico Grancolombiano</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            poli: {
+              navy: '#002060',
+              cyan: '#00C2FF',
+              darkBg: '#0b132b',
+              cardBg: '#1c2541',
+              accent: '#3a506b',
+              highlight: '#48cae4'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <!-- Lucide Icons CDN (versión fijada: evita renombres de iconos con @latest) -->
+  <script src="https://unpkg.com/lucide@0.294.0"></script>
+
+  <style>
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #0b132b; }
+    ::-webkit-scrollbar-thumb { background: #1c2541; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #00C2FF; }
+    textarea, input { break-inside: avoid; }
+
+    /* ===== Sistema de toasts (no bloqueante, reemplaza alert) ===== */
+    #toast-container {
+      position: fixed; bottom: 1rem; right: 1rem; left: 1rem;
+      display: flex; flex-direction: column; gap: 0.5rem;
+      z-index: 9999; pointer-events: none;
+    }
+    @media (min-width: 640px) {
+      #toast-container { left: auto; width: 22rem; bottom: 1.25rem; right: 1.25rem; }
+    }
+    .toast {
+      pointer-events: auto;
+      border-radius: 0.5rem; padding: 0.75rem 1rem;
+      font-size: 0.75rem; line-height: 1.4; color: #f1f5f9;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      border: 1px solid rgba(255,255,255,0.15);
+      background: #1e293b;
+      animation: toast-in 0.25s ease-out;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+    }
+    .toast-success { background: #064e3b; border-color: #10b981; }
+    .toast-error   { background: #7f1d1d; border-color: #ef4444; }
+    .toast-warning { background: #78350f; border-color: #f59e0b; }
+    .toast-info    { background: #1e3a8a; border-color: #3b82f6; }
+    @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ===== Ruta Ctrl+P directa: neutraliza tema oscuro ===== */
+    @media print {
+      html, body { background: #ffffff !important; color: #111827 !important; }
+      header, footer, aside, .no-print, #toast-container { display: none !important; }
+      section, div, p, span, h1, h2, h3 { color: #111827 !important; background: transparent !important; border-color: #9ca3af !important; box-shadow: none !important; }
+      .grid { display: block !important; }
+      #acc-1, #acc-2, #acc-3, #acc-4 { display: block !important; }
+      textarea, input, select {
+        border: 1px solid #9ca3af !important; background: #ffffff !important;
+        color: #111827 !important; -webkit-appearance: none; appearance: none;
+      }
+      table { width: 100% !important; font-size: 9px; }
+      main { width: 100% !important; }
+      * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body class="bg-poli-darkBg text-slate-100 font-sans min-h-screen flex flex-col antialiased selection:bg-poli-cyan selection:text-poli-navy">
+
+  <!-- Contenedor de toasts -->
+  <div id="toast-container" aria-live="polite"></div>
+
+  <!-- BARRA DE NAVEGACIÓN SUPERIOR (PROGRESO GLOBAL) -->
+  <header class="sticky top-0 z-50 bg-poli-navy/95 backdrop-blur border-b border-poli-cyan/30 shadow-lg no-print">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div class="flex items-center space-x-3">
+        <div class="bg-poli-cyan text-poli-navy font-black px-3 py-1 rounded text-sm tracking-wider uppercase shadow">
+          POLI 360°
+        </div>
+        <div>
+          <h1 class="text-base font-bold text-white leading-tight">De la Conversación a la Automatización Agéntica</h1>
+          <p class="text-xs text-poli-cyan font-mono">Módulo: El Auxiliar Administrativo 4.0</p>
+        </div>
+      </div>
+
+      <!-- Indicador de Progreso -->
+      <div class="w-full md:w-1/3 bg-slate-800 rounded-full h-3 border border-slate-700 overflow-hidden relative">
+        <div id="progress-bar" class="bg-gradient-to-r from-poli-cyan to-blue-500 h-full w-0 transition-all duration-300"></div>
+      </div>
+      <div class="text-xs font-mono text-slate-300">
+        Progreso: <span id="progress-percent" class="text-poli-cyan font-bold">0%</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- CONTENEDOR PRINCIPAL: ARQUITECTURA 30/70 -->
+  <div class="max-w-7xl mx-auto w-full px-4 py-6 flex-grow flex flex-col lg:flex-row gap-6">
+
+    <!-- PANEL IZQUIERDO (30%): REGISTRO, CONTROLES JSON Y TRANSMISIÓN -->
+    <aside class="w-full lg:w-1/3 flex flex-col gap-5 no-print">
+      
+      <!-- Card Identificación -->
+      <div class="bg-poli-cardBg border border-slate-700/80 rounded-xl p-5 shadow-md relative overflow-hidden">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-poli-cyan mb-4 flex items-center gap-2">
+          <i data-lucide="user-check" class="w-4 h-4"></i> Datos del Taller Institucional
+        </h2>
+        
+        <form id="form-registro" class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Asignatura</label>
+            <input type="text" id="input-materia" value="Administración 4.0" readonly class="w-full bg-slate-900/80 border border-slate-700 rounded px-3 py-2 text-xs text-slate-300 font-medium cursor-not-allowed" />
+          </div>
+          
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">ID Único de Actividad</label>
+            <!-- INYECCIÓN CONGELADA (PASO 0.2) -->
+            <input type="text" id="input-actividad-id" value="Administracion4.0_ACT13" readonly class="w-full bg-slate-900/80 border border-slate-700 rounded px-3 py-2 text-xs text-poli-cyan font-mono font-bold cursor-not-allowed" />
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Nombre del Estudiante <span class="text-red-400">*</span></label>
+            <input type="text" id="input-estudiante-nombre" placeholder="Ej. Ana María Gómez" class="w-full bg-slate-900 border border-slate-600 focus:border-poli-cyan rounded px-3 py-2 text-xs text-white outline-none transition" required />
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Código Estudiantil <span class="text-red-400">*</span></label>
+            <input type="text" id="input-estudiante-codigo" placeholder="Ej. 100234567" class="w-full bg-slate-900 border border-slate-600 focus:border-poli-cyan rounded px-3 py-2 text-xs text-white outline-none transition" required />
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Programa Académico <span class="text-red-400">*</span></label>
+            <input type="text" id="input-estudiante-programa" placeholder="Ej. Administración de Empresas" class="w-full bg-slate-900 border border-slate-600 focus:border-poli-cyan rounded px-3 py-2 text-xs text-white outline-none transition" required />
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Grupo / Ficha</label>
+            <input type="text" id="input-grupo" placeholder="Ej. Grupo 01" class="w-full bg-slate-900 border border-slate-600 focus:border-poli-cyan rounded px-3 py-2 text-xs text-white outline-none transition" />
+          </div>
+        </form>
+      </div>
+
+      <!-- Card Gestión JSON & Autoguardado -->
+      <div class="bg-poli-cardBg border border-slate-700/80 rounded-xl p-5 shadow-md">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-poli-cyan mb-3 flex items-center gap-2">
+          <i data-lucide="save" class="w-4 h-4"></i> Gestión de Estado & JSON
+        </h2>
+        <div class="flex flex-col gap-2">
+          <button onclick="downloadBackup()" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 font-semibold py-2 px-3 rounded text-xs flex items-center justify-center gap-2 transition">
+            <i data-lucide="download" class="w-4 h-4 text-poli-cyan"></i> Descargar Respaldo JSON
+          </button>
+          
+          <label class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 font-semibold py-2 px-3 rounded text-xs flex items-center justify-center gap-2 cursor-pointer transition">
+            <i data-lucide="upload" class="w-4 h-4 text-emerald-400"></i> Cargar Respaldo JSON
+            <input type="file" id="json-upload" accept=".json" class="hidden" onchange="handleFileUpload(event)">
+          </label>
+        </div>
+        <div id="save-status" class="mt-3 text-[10px] font-mono text-slate-400 text-center">Autoguardado activo</div>
+      </div>
+
+      <!-- Card Transmisión Webhook y PDF -->
+      <div class="bg-gradient-to-b from-poli-cardBg to-slate-900 border border-poli-cyan/40 rounded-xl p-5 shadow-xl flex flex-col gap-4">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-poli-cyan flex items-center gap-2">
+          <i data-lucide="send" class="w-4 h-4"></i> Transmisión & Entrega
+        </h2>
+
+        <!-- BOTÓN PRINCIPAL (PASO 3) -->
+        <button id="btn-enviar-trabajo" onclick="sendData()" class="w-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold py-3.5 px-4 rounded-lg shadow-lg hover:shadow-emerald-500/20 text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition transform hover:-translate-y-0.5">
+          <i data-lucide="check-circle" class="w-5 h-5"></i> Enviar Trabajo (Servidor)
+        </button>
+
+        <div id="transmission-status-banner" class="bg-amber-950/40 border border-amber-600/50 rounded p-2.5 text-[11px] text-amber-300 flex items-start gap-2">
+          <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
+          <span><strong>Estado:</strong> No enviado. Debes presionar "Enviar Trabajo" para habilitar la vista previa PDF.</span>
+        </div>
+
+        <!-- BOTÓN BLOQUEADO (PASO 3.1) -->
+        <button id="btn-open-preview" onclick="openPreview()" disabled class="w-full bg-slate-800 text-slate-500 border border-slate-700 font-bold py-3 px-4 rounded-lg text-xs uppercase tracking-wider flex items-center justify-center gap-2 opacity-50 cursor-not-allowed transition" title="Primero envía tus datos al servidor docente.">
+          <i data-lucide="file-text" class="w-4 h-4"></i> Exportar a PDF / Imprimir
+        </button>
+      </div>
+
+    </aside>
+
+    <!-- PANEL DERECHO (70%) -->
+    <main class="w-full lg:w-2/3 flex flex-col gap-6">
+
+      <!-- RUTA DE TRABAJO AUTÓNOMO -->
+      <section class="bg-gradient-to-r from-slate-900 via-poli-cardBg to-slate-900 border border-poli-cyan/50 rounded-xl p-5 shadow-md">
+        <h2 class="text-sm font-bold uppercase tracking-wider text-poli-cyan mb-3 flex items-center gap-2">
+          <i data-lucide="compass" class="w-5 h-5"></i> Ruta de Trabajo Autónomo
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+          <div class="bg-slate-900/90 border border-slate-700/70 rounded p-3 flex gap-3">
+            <span class="w-6 h-6 rounded-full bg-poli-cyan text-poli-navy font-bold flex items-center justify-center shrink-0">1</span>
+            <div><strong class="text-slate-200 block mb-1">Exploración Teórica</strong>Revisa los 4 niveles de la Escalera de Evolución.</div>
+          </div>
+          <div class="bg-slate-900/90 border border-slate-700/70 rounded p-3 flex gap-3">
+            <span class="w-6 h-6 rounded-full bg-poli-cyan text-poli-navy font-bold flex items-center justify-center shrink-0">2</span>
+            <div><strong class="text-slate-200 block mb-1">Investigación & Matriz</strong>Completa las 4 filas de la matriz y tus fuentes citadas.</div>
+          </div>
+          <div class="bg-slate-900/90 border border-slate-700/70 rounded p-3 flex gap-3">
+            <span class="w-6 h-6 rounded-full bg-emerald-400 text-slate-950 font-bold flex items-center justify-center shrink-0">3</span>
+            <div><strong class="text-emerald-300 block mb-1">Envío al Servidor Docente</strong>Transmitir para desbloquear el reporte PDF.</div>
+          </div>
+          <div class="bg-slate-900/90 border border-slate-700/70 rounded p-3 flex gap-3">
+            <span class="w-6 h-6 rounded-full bg-purple-400 text-slate-950 font-bold flex items-center justify-center shrink-0">4</span>
+            <div><strong class="text-purple-300 block mb-1">Generación de PDF</strong>Exportar el informe final para la entrega formal en LMS.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- FASE 1: ESCALERA DE EVOLUCIÓN -->
+      <section class="bg-poli-cardBg border border-slate-700/80 rounded-xl p-6 shadow-md">
+        <h2 class="text-base font-bold text-white mb-4 flex items-center gap-2">
+          <span class="bg-poli-navy text-poli-cyan px-2 py-0.5 rounded text-xs font-mono border border-poli-cyan/40">FASE 1</span>
+          La Escalera de Evolución de la IA Generativa
+        </h2>
+        <div class="space-y-3">
+          <div class="border border-slate-700 rounded-lg bg-slate-900/50">
+            <button onclick="toggleAccordion('acc-1')" class="w-full text-left p-3.5 font-semibold text-xs text-slate-200 bg-slate-800/80 flex items-center justify-between">
+              <span><span class="bg-blue-900 text-blue-300 px-2 py-0.5 rounded text-[10px] font-mono mr-2">Nivel 1</span>Chatbot Conversacional Básico</span>
+              <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400" id="icon-acc-1"></i>
+            </button>
+            <div id="acc-1" class="hidden p-4 text-xs text-slate-300 border-t border-slate-800">Prompting textual estándar (ChatGPT/Gemini Web). Sin contexto ni integraciones.</div>
+          </div>
+          <div class="border border-slate-700 rounded-lg bg-slate-900/50">
+            <button onclick="toggleAccordion('acc-2')" class="w-full text-left p-3.5 font-semibold text-xs text-slate-200 bg-slate-800/80 flex items-center justify-between">
+              <span><span class="bg-teal-900 text-teal-300 px-2 py-0.5 rounded text-[10px] font-mono mr-2">Nivel 2</span>Multimodalidad & Procesamiento Documental</span>
+              <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400" id="icon-acc-2"></i>
+            </button>
+            <div id="acc-2" class="hidden p-4 text-xs text-slate-300 border-t border-slate-800">Interpretación de documentos no estructurados (PDFs, facturas escaneadas, imágenes y audios).</div>
+          </div>
+          <div class="border border-slate-700 rounded-lg bg-slate-900/50">
+            <button onclick="toggleAccordion('acc-3')" class="w-full text-left p-3.5 font-semibold text-xs text-slate-200 bg-slate-800/80 flex items-center justify-between">
+              <span><span class="bg-indigo-900 text-indigo-300 px-2 py-0.5 rounded text-[10px] font-mono mr-2">Nivel 3</span>Asistentes de Dominio Privado (RAG)</span>
+              <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400" id="icon-acc-3"></i>
+            </button>
+            <div id="acc-3" class="hidden p-4 text-xs text-slate-300 border-t border-slate-800">Conexión con repositorios corporativos mediante RAG para consulta de políticas internas y citación de fuentes.</div>
+          </div>
+          <div class="border border-slate-700 rounded-lg bg-slate-900/50">
+            <button onclick="toggleAccordion('acc-4')" class="w-full text-left p-3.5 font-semibold text-xs text-slate-200 bg-slate-800/80 flex items-center justify-between">
+              <span><span class="bg-purple-900 text-purple-300 px-2 py-0.5 rounded text-[10px] font-mono mr-2">Nivel 4</span>Agentes Autónomos & APIs</span>
+              <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400" id="icon-acc-4"></i>
+            </button>
+            <div id="acc-4" class="hidden p-4 text-xs text-slate-300 border-t border-slate-800">Ejecución end-to-end con llamados a Webhooks, modificación de bases de datos y flujos de automatización sin supervisión manual continua.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- FASE 2: RASTREADOR DE FUENTES -->
+      <section class="bg-poli-cardBg border border-slate-700/80 rounded-xl p-6 shadow-md space-y-6">
+        <h2 class="text-base font-bold text-white flex items-center gap-2">
+          <span class="bg-poli-navy text-poli-cyan px-2 py-0.5 rounded text-xs font-mono border border-poli-cyan/40">FASE 2</span>
+          Rastreador de Fuentes e Investigación Externa
+        </h2>
+
+        <!-- Eje 1 -->
+        <div class="bg-slate-900/80 border border-slate-700 rounded-lg p-4 space-y-3">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-poli-cyan flex items-center gap-2">
+            <i data-lucide="cpu" class="w-4 h-4"></i> Eje 1: Herramientas del Ecosistema Activo
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <input type="text" id="item-1-h1" placeholder="Herramienta 1 (Ej. Zapier AI)" class="bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" required />
+            <input type="text" id="item-1-h2" placeholder="Herramienta 2 (Ej. Power Automate AI)" class="bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" required />
+          </div>
+          <input type="url" id="item-1-url" placeholder="https://ejemplo.com/fuente-consultada" class="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" required />
+          <textarea id="item-1" rows="3" placeholder="Descripción de la tarea automática..." class="w-full bg-slate-950 border border-slate-700 rounded p-2.5 text-xs text-white" required></textarea>
+        </div>
+
+        <!-- Eje 2 -->
+        <div class="bg-slate-900/80 border border-slate-700 rounded-lg p-4 space-y-3">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-poli-cyan flex items-center gap-2">
+            <i data-lucide="briefcase" class="w-4 h-4"></i> Eje 2: Casos de Uso Reales (2025/2026)
+          </h3>
+          <select id="item-2-area" class="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" required>
+            <option value="">-- Selecciona un Área --</option>
+            <option value="Servicio al Cliente & Soporte">Servicio al Cliente & Soporte</option>
+            <option value="Compras, Proveedores y Facturación">Compras, Proveedores y Facturación</option>
+            <option value="Gestión Contable y Auditoría">Gestión Contable y Auditoría</option>
+            <option value="Gestión del Talento Humano">Gestión del Talento Humano</option>
+          </select>
+          <input type="url" id="item-2-url" placeholder="https://ejemplo.com/caso-estudio-2025" class="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-white" required />
+          <textarea id="item-2" rows="3" placeholder="Resumen del caso real..." class="w-full bg-slate-950 border border-slate-700 rounded p-2.5 text-xs text-white" required></textarea>
+        </div>
+
+        <!-- Eje 3 -->
+        <div class="bg-slate-900/80 border border-slate-700 rounded-lg p-4 space-y-3">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-poli-cyan flex items-center gap-2">
+            <i data-lucide="award" class="w-4 h-4"></i> Eje 3: Competencias del Auxiliar 4.0
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <input type="text" id="item-3-c1" placeholder="Competencia 1" class="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white" required />
+            <input type="text" id="item-3-c2" placeholder="Competencia 2" class="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white" required />
+            <input type="text" id="item-3-c3" placeholder="Competencia 3" class="bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white" required />
+          </div>
+          <textarea id="item-3" rows="3" placeholder="Análisis sintético de la evolución del mercado laboral..." class="w-full bg-slate-950 border border-slate-700 rounded p-2.5 text-xs text-white" required></textarea>
+        </div>
+
+      </section>
+
+      <!-- FASE 3: MATRIZ DE TRANSFORMACIÓN COMPLETA (4 FILAS RESTAURADAS) -->
+      <section class="bg-poli-cardBg border border-slate-700/80 rounded-xl p-6 shadow-md space-y-4">
+        <h2 class="text-base font-bold text-white flex items-center gap-2">
+          <span class="bg-poli-navy text-poli-cyan px-2 py-0.5 rounded text-xs font-mono border border-poli-cyan/40">FASE 3</span>
+          Matriz de Transformación del Rol Administrativo
+        </h2>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr class="bg-slate-900 text-poli-cyan border-b border-slate-700">
+                <th class="p-2 border border-slate-800">Tarea Manual Actual</th>
+                <th class="p-2 border border-slate-800">Solución N1 (Chatbot)</th>
+                <th class="p-2 border border-slate-800">Solución N4 (Agéntica)</th>
+                <th class="p-2 border border-slate-800">Rol / Valor Agregado</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800">
+              <!-- Ejemplo Congelado -->
+              <tr class="bg-slate-900/40 text-slate-400 italic">
+                <td class="p-2 border border-slate-800">Revisar 50 facturas PDF y vaciarlas a Excel.</td>
+                <td class="p-2 border border-slate-800">Copiar texto en ChatGPT para extraer datos.</td>
+                <td class="p-2 border border-slate-800">Script Python que procesa Drive y genera JSON en Sheets.</td>
+                <td class="p-2 border border-slate-800">Auditor de inconsistencias y diseñador de reglas.</td>
+              </tr>
+              
+              <!-- FILA 1 -->
+              <tr class="bg-slate-950">
+                <td class="p-2 border border-slate-800"><textarea id="matriz-m1" rows="2" placeholder="Tarea 1 Manual..." class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white" required></textarea></td>
+                <td class="p-2 border border-slate-800"><textarea id="matriz-n1" rows="2" placeholder="Solución N1..." class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white" required></textarea></td>
+                <td class="p-2 border border-slate-800"><textarea id="matriz-n4" rows="2" placeholder="Solución N4..." class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white" required></textarea></td>
+                <td class="p-2 border border-slate-800"><textarea id="matriz-v1" rows="2" placeholder="Nuevo valor..." class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white" required></textarea></td>
+              </tr>
+
+              <!-- FILA 2 -->
+              <tr class="bg-slate-950">
+                <td class="p-2 border border-slate-800"><textarea id="matriz-m2" rows="2" placeholder="Tarea 2 Manual..." class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white" required></textarea></td>
+                <td class="p-2 border border-slate-800"><textarea id="matriz-n2" rows="2" placeholder="Solución N1..." class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white" required></textarea></td>
+                <td class="p-2 border border-slate-800"><textarea id="matriz-n2_4" rows="2" placeholder="Solución N4..." class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white" required></textarea></td>
+                <td class="p-2 border border-slate-800"><textarea id="matriz-v2" rows="2" placeholder="Nuevo valor..." class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white" required></textarea></td>
+              </tr>
+
+              <!-- FILA 3 -->
+              <tr class="bg-slate-950">
+                <td class="p-2 border border-slate-800"><textarea id="matriz-m3" rows="2" placeholder="Tarea 3 Manual..." class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white" required></textarea></td>
+                <td class="p-2 border border-slate-800"><textarea id="matriz-n3" rows="2" placeholder="Solución N1..." class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white" required></textarea></td>
+                <td class="p-2 border border-slate-800"><textarea id="matriz-n3_4" rows="2" placeholder="Solución N4..." class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white" required></textarea></td>
+                <td class="p-2 border border-slate-800"><textarea id="matriz-v3" rows="2" placeholder="Nuevo valor..." class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white" required></textarea></td>
+              </tr>
+
+              <!-- FILA 4 -->
+              <tr class="bg-slate-950">
+                <td class="p-2 border border-slate-800"><textarea id="matriz-m4" rows="2" placeholder="Tarea 4 Manual..." class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white" required></textarea></td>
+                <td class="p-2 border border-slate-800"><textarea id="matriz-n4_1" rows="2" placeholder="Solución N1..." class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white" required></textarea></td>
+                <td class="p-2 border border-slate-800"><textarea id="matriz-n4_4" rows="2" placeholder="Solución N4..." class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white" required></textarea></td>
+                <td class="p-2 border border-slate-800"><textarea id="matriz-v4" rows="2" placeholder="Nuevo valor..." class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs text-white" required></textarea></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-200 mb-1">Síntesis Integradora de la Matriz <span class="text-red-400">*</span></label>
+          <textarea id="item-4" rows="3" placeholder="Resume el impacto global de la matriz..." class="w-full bg-slate-950 border border-slate-700 rounded p-2.5 text-xs text-white" required></textarea>
+        </div>
+      </section>
+
+      <!-- FASE 4: NORMATIVA LEY 1581 & RÚBRICA -->
+      <section class="bg-poli-cardBg border border-slate-700/80 rounded-xl p-6 shadow-md space-y-6">
+        <h2 class="text-base font-bold text-white flex items-center gap-2">
+          <span class="bg-poli-navy text-poli-cyan px-2 py-0.5 rounded text-xs font-mono border border-poli-cyan/40">FASE 4</span>
+          Gobernanza de Datos & Rúbrica Evaluativa
+        </h2>
+
+        <div class="bg-slate-900/80 border border-slate-700 rounded-lg p-4 space-y-3">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-2">
+            <i data-lucide="shield-alert" class="w-4 h-4"></i> Análisis Habeas Data (Ley 1581 de 2012)
+          </h3>
+          <textarea id="item-5" rows="4" placeholder="Argumentación sobre mitigación de riesgos de fuga de datos en modelos RAG/APIs..." class="w-full bg-slate-950 border border-slate-700 rounded p-2.5 text-xs text-white" required></textarea>
+        </div>
+
+        <!-- RÚBRICA DE 5 ÍTEMS INTEGRIDAD TEXTUAL -->
+        <div class="bg-slate-900/90 border border-slate-700 rounded-lg p-4 space-y-3">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-poli-cyan flex items-center gap-2">
+            <i data-lucide="clipboard-check" class="w-4 h-4"></i> Rúbrica Evaluativa Oficial (5 Ítems)
+          </h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-[11px] border-collapse">
+              <thead>
+                <tr class="bg-poli-navy text-poli-cyan border-b border-slate-700">
+                  <th class="p-2 border border-slate-800 w-1/4">Criterio</th>
+                  <th class="p-2 border border-slate-800 w-1/3">Aceptable</th>
+                  <th class="p-2 border border-slate-800 w-1/3">Excelente</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800 text-slate-300">
+                <tr>
+                  <td class="p-2 border border-slate-800 font-semibold text-white">1. Rigor de Fuentes y Rastreo</td>
+                  <td class="p-2 border border-slate-800">Identifica herramientas y casos generales.</td>
+                  <td class="p-2 border border-slate-800 text-emerald-300">URLs verificables, analiza 2 herramientas N4 y cita casos reales 2025/2026.</td>
+                </tr>
+                <tr>
+                  <td class="p-2 border border-slate-800 font-semibold text-white">2. Comprensión de la Escalera Agéntica</td>
+                  <td class="p-2 border border-slate-800">Diferencia chat textual de automatización.</td>
+                  <td class="p-2 border border-slate-800 text-emerald-300">Modela con precisión la transición a flujos agénticos (N4).</td>
+                </tr>
+                <tr>
+                  <td class="p-2 border border-slate-800 font-semibold text-white">3. Matriz de Impacto en el Rol 4.0</td>
+                  <td class="p-2 border border-slate-800">Conecta tareas diarias con soluciones IA.</td>
+                  <td class="p-2 border border-slate-800 text-emerald-300">Define con claridad su rol como supervisor de reglas.</td>
+                </tr>
+                <tr>
+                  <td class="p-2 border border-slate-800 font-semibold text-white">4. Ética y Habeas Data (Ley 1581)</td>
+                  <td class="p-2 border border-slate-800">Menciona la Ley 1581 de forma general.</td>
+                  <td class="p-2 border border-slate-800 text-emerald-300">Analiza riesgos específicos de datos sensibles en RAG/API.</td>
+                </tr>
+                <tr>
+                  <td class="p-2 border border-slate-800 font-semibold text-white">5. Transmisión Integrada & Evidencia</td>
+                  <td class="p-2 border border-slate-800">Reporte parcial sin respaldo claro.</td>
+                  <td class="p-2 border border-slate-800 text-emerald-300">Transmite exitosamente al webhook docente y exporta el PDF formal completo.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+  </div>
+
+  <footer class="bg-poli-navy border-t border-slate-800 text-slate-400 py-4 text-center text-xs">
+    Politécnico Grancolombiano &copy; 2026 — Modelo Metodológico Miguel Cruz | ID: Administracion4.0_ACT13
+  </footer>
+
+  <script>
+    const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbykP5mOpfvgjO-R3aMf2t8tzAg-nc5Tc2cpVmtpRh33C-ZwYUW9G9-CWr-bq7zVEv5s/exec";
+    const STORAGE_KEY = "auxiliar40_investigacion_data_ACT13_v2";
+    const ACTIVIDAD_ID_ESPERADA = "Administracion4.0_ACT13";
+    const URL_REGEX = /^https?:\/\/[^\s]+\.[^\s]+/i;
+    let datosTransmitidos = false;
+    let lastTransmittedHash = null;
+
+    document.addEventListener("DOMContentLoaded", () => {
+      lucide.createIcons();
+      loadFromLocalStorage();
+      setupAutoSave();
+      updateProgressBar();
+      restoreTransmissionLock();
+    });
+
+    // ===== Sistema de toasts (reemplaza alert) =====
+    function showToast(message, type = "info", duration = 5000) {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.textContent = message;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.transition = "opacity 0.3s ease";
+        toast.style.opacity = "0";
+        setTimeout(() => toast.remove(), 300);
+      }, duration);
+    }
+
+    // ===== Hash de integridad: detecta cualquier edición post-envío =====
+    function computeHash() {
+      const data = getFormData();
+      // Excluye campos de estado/fecha para que solo el CONTENIDO dispare el candado
+      const { estado, fecha_registro, transmitted, hash, ...contenido } = data;
+      const str = JSON.stringify(contenido);
+      let h = 0;
+      for (let i = 0; i < str.length; i++) {
+        h = (h << 5) - h + str.charCodeAt(i);
+        h |= 0;
+      }
+      return String(h);
+    }
+
+    function lockPdfButton() {
+      const btnPdf = document.getElementById('btn-open-preview');
+      btnPdf.disabled = true;
+      btnPdf.classList.add('opacity-50', 'cursor-not-allowed', 'bg-slate-800', 'text-slate-500');
+      btnPdf.classList.remove('bg-purple-700', 'hover:bg-purple-600', 'text-white', 'shadow-lg', 'cursor-pointer');
+    }
+
+    function unlockPdfButton() {
+      const btnPdf = document.getElementById('btn-open-preview');
+      btnPdf.disabled = false;
+      btnPdf.classList.remove('opacity-50', 'cursor-not-allowed', 'bg-slate-800', 'text-slate-500');
+      btnPdf.classList.add('bg-purple-700', 'hover:bg-purple-600', 'text-white', 'shadow-lg', 'cursor-pointer');
+    }
+
+    // Restaura el candado tras recargar SOLO si el contenido coincide con el hash transmitido
+    function restoreTransmissionLock() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) return;
+      try {
+        const data = JSON.parse(saved);
+        if (data.transmitted === "true" && data.hash && computeHash() === data.hash) {
+          datosTransmitidos = true;
+          lastTransmittedHash = data.hash;
+          markTransmittedUI();
+          unlockPdfButton();
+        }
+        // Si el hash no coincide (editó antes de recargar), queda re-bloqueado por defecto
+      } catch (e) {
+        console.error("Error al restaurar candado de transmisión", e);
+      }
+    }
+
+    function markTransmittedUI() {
+      const banner = document.getElementById('transmission-status-banner');
+      banner.className = "bg-emerald-950/40 border border-emerald-600/50 rounded p-2.5 text-[11px] text-emerald-300 flex items-start gap-2";
+      banner.innerHTML = `<i data-lucide="check-circle" class="w-4 h-4 text-emerald-400 shrink-0 mt-0.5"></i>
+        <span><strong>✅ Registrado:</strong> Respuestas sincronizadas. Ya puedes exportar tu reporte en PDF.</span>`;
+      const btnSend = document.getElementById('btn-enviar-trabajo');
+      btnSend.innerHTML = `<i data-lucide="check-circle" class="w-5 h-5"></i> ¡Trabajo Transmitido!`;
+      btnSend.classList.remove('from-emerald-500', 'to-teal-600', 'hover:from-emerald-400', 'hover:to-teal-500');
+      btnSend.classList.add('from-slate-700', 'to-slate-800');
+      lucide.createIcons();
+    }
+
+    function markNotTransmittedUI() {
+      const banner = document.getElementById('transmission-status-banner');
+      banner.className = "bg-amber-950/40 border border-amber-600/50 rounded p-2.5 text-[11px] text-amber-300 flex items-start gap-2";
+      banner.innerHTML = `<i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
+        <span><strong>Estado:</strong> No enviado. Debes presionar "Enviar Trabajo" para habilitar la vista previa PDF.</span>`;
+      const btnSend = document.getElementById('btn-enviar-trabajo');
+      btnSend.innerHTML = `<i data-lucide="check-circle" class="w-5 h-5"></i> Enviar Trabajo (Servidor)`;
+      btnSend.classList.remove('from-slate-700', 'to-slate-800');
+      btnSend.classList.add('from-emerald-500', 'to-teal-600', 'hover:from-emerald-400', 'hover:to-teal-500');
+      lucide.createIcons();
+    }
+
+    function toggleAccordion(id) {
+      const el = document.getElementById(id);
+      const icon = document.getElementById(`icon-${id}`);
+      if (el.classList.contains("hidden")) {
+        el.classList.remove("hidden");
+        icon.classList.add("rotate-180");
+      } else {
+        el.classList.add("hidden");
+        icon.classList.remove("rotate-180");
+      }
+    }
+
+    function getFormData() {
+      return {
+        materia: document.getElementById('input-materia')?.value || "Administración 4.0",
+        actividad_id: document.getElementById('input-actividad-id')?.value || ACTIVIDAD_ID_ESPERADA,
+        grupo: document.getElementById('input-grupo')?.value || "",
+        participantes: document.getElementById('input-estudiante-nombre')?.value || "",
+        estudiante_codigo: document.getElementById('input-estudiante-codigo')?.value || "",
+        estudiante_programa: document.getElementById('input-estudiante-programa')?.value || "",
+        
+        item1_h1: document.getElementById('item-1-h1')?.value || "",
+        item1_h2: document.getElementById('item-1-h2')?.value || "",
+        item1_url: document.getElementById('item-1-url')?.value || "",
+        item1: document.getElementById('item-1')?.value || "",
+        
+        item2_area: document.getElementById('item-2-area')?.value || "",
+        item2_url: document.getElementById('item-2-url')?.value || "",
+        item2: document.getElementById('item-2')?.value || "",
+
+        item3_c1: document.getElementById('item-3-c1')?.value || "",
+        item3_c2: document.getElementById('item-3-c2')?.value || "",
+        item3_c3: document.getElementById('item-3-c3')?.value || "",
+        item3: document.getElementById('item-3')?.value || "",
+
+        // Mapeo 4 Filas de la Matriz
+        matriz_m1: document.getElementById('matriz-m1')?.value || "",
+        matriz_n1: document.getElementById('matriz-n1')?.value || "",
+        matriz_n4: document.getElementById('matriz-n4')?.value || "",
+        matriz_v1: document.getElementById('matriz-v1')?.value || "",
+
+        matriz_m2: document.getElementById('matriz-m2')?.value || "",
+        matriz_n2: document.getElementById('matriz-n2')?.value || "",
+        matriz_n2_4: document.getElementById('matriz-n2_4')?.value || "",
+        matriz_v2: document.getElementById('matriz-v2')?.value || "",
+
+        matriz_m3: document.getElementById('matriz-m3')?.value || "",
+        matriz_n3: document.getElementById('matriz-n3')?.value || "",
+        matriz_n3_4: document.getElementById('matriz-n3_4')?.value || "",
+        matriz_v3: document.getElementById('matriz-v3')?.value || "",
+
+        matriz_m4: document.getElementById('matriz-m4')?.value || "",
+        matriz_n4_1: document.getElementById('matriz-n4_1')?.value || "",
+        matriz_n4_4: document.getElementById('matriz-n4_4')?.value || "",
+        matriz_v4: document.getElementById('matriz-v4')?.value || "",
+
+        item4: document.getElementById('item-4')?.value || "",
+        item5: document.getElementById('item-5')?.value || "",
+        estado: datosTransmitidos ? "Entregado" : "Borrador",
+        fecha_registro: new Date().toLocaleString(),
+        transmitted: datosTransmitidos ? "true" : "false",
+        hash: lastTransmittedHash || ""
+      };
+    }
+
+    function validateRequiredFields() {
+      const data = getFormData();
+      const requiredKeys = [
+        'participantes', 'estudiante_codigo', 'estudiante_programa',
+        'item1_h1', 'item1_h2', 'item1_url', 'item1',
+        'item2_area', 'item2_url', 'item2',
+        'item3_c1', 'item3_c2', 'item3_c3', 'item3',
+        'matriz_m1', 'matriz_n1', 'matriz_n4', 'matriz_v1',
+        'matriz_m2', 'matriz_n2', 'matriz_n2_4', 'matriz_v2',
+        'matriz_m3', 'matriz_n3', 'matriz_n3_4', 'matriz_v3',
+        'matriz_m4', 'matriz_n4_1', 'matriz_n4_4', 'matriz_v4',
+        'item4', 'item5'
+      ];
+      if (!requiredKeys.every(k => data[k] && String(data[k]).trim() !== "")) {
+        return { ok: false, msg: "⚠️ ATENCIÓN: Tienes campos vacíos. Completa todas las preguntas y filas de la matriz antes de enviar." };
+      }
+      // Validación de formato de URLs (rúbrica: URLs verificables)
+      for (const [key, label] of [['item1_url', 'Fuente del Eje 1'], ['item2_url', 'Fuente del Eje 2']]) {
+        if (!URL_REGEX.test(String(data[key]).trim())) {
+          return { ok: false, msg: `⚠️ La ${label} no es una URL válida. Debe iniciar por http:// o https:// y contener un dominio (ej. https://ejemplo.com/pagina).` };
+        }
+      }
+      return { ok: true };
+    }
+
+    function updateProgressBar() {
+      const data = getFormData();
+      const fields = [
+        'participantes', 'estudiante_codigo', 'estudiante_programa',
+        'item1_h1', 'item1_h2', 'item1_url', 'item1',
+        'item2_area', 'item2_url', 'item2',
+        'item3_c1', 'item3_c2', 'item3_c3', 'item3',
+        'matriz_m1', 'matriz_n1', 'matriz_n4', 'matriz_v1',
+        'matriz_m2', 'matriz_n2', 'matriz_n2_4', 'matriz_v2',
+        'matriz_m3', 'matriz_n3', 'matriz_n3_4', 'matriz_v3',
+        'matriz_m4', 'matriz_n4_1', 'matriz_n4_4', 'matriz_v4',
+        'item4', 'item5'
+      ];
+      let filled = fields.filter(f => data[f] && String(data[f]).trim() !== "").length;
+      const percent = Math.round((filled / fields.length) * 100);
+      document.getElementById('progress-bar').style.width = `${percent}%`;
+      document.getElementById('progress-percent').innerText = `${percent}%`;
+    }
+
+    function setupAutoSave() {
+      document.querySelectorAll('input, textarea, select').forEach(input => {
+        const handler = () => {
+          saveToLocalStorage();
+          updateProgressBar();
+          // Candado post-envío: cualquier edición re-bloquea el PDF
+          if (datosTransmitidos && lastTransmittedHash !== null && computeHash() !== lastTransmittedHash) {
+            datosTransmitidos = false;
+            lockPdfButton();
+            markNotTransmittedUI();
+            saveToLocalStorage();
+            showToast("✏️ Detecté una edición después del envío. Debes volver a transmitir para exportar el PDF.", "warning", 7000);
+          }
+        };
+        input.addEventListener('input', handler);
+        input.addEventListener('change', handler); // cubre <select>
+      });
+    }
+
+    function saveToLocalStorage() {
+      const data = getFormData();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      document.getElementById('save-status').innerText = `Autoguardado: ${new Date().toLocaleTimeString()}`;
+    }
+
+    function loadFromLocalStorage() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) return;
+      try {
+        const data = JSON.parse(saved);
+        const fieldMap = {
+          participantes: 'input-estudiante-nombre',
+          estudiante_codigo: 'input-estudiante-codigo',
+          estudiante_programa: 'input-estudiante-programa',
+          grupo: 'input-grupo',
+          item1_h1: 'item-1-h1', item1_h2: 'item-1-h2', item1_url: 'item-1-url', item1: 'item-1',
+          item2_area: 'item-2-area', item2_url: 'item-2-url', item2: 'item-2',
+          item3_c1: 'item-3-c1', item3_c2: 'item-3-c2', item3_c3: 'item-3-c3', item3: 'item-3',
+          matriz_m1: 'matriz-m1', matriz_n1: 'matriz-n1', matriz_n4: 'matriz-n4', matriz_v1: 'matriz-v1',
+          matriz_m2: 'matriz-m2', matriz_n2: 'matriz-n2', matriz_n2_4: 'matriz-n2_4', matriz_v2: 'matriz-v2',
+          matriz_m3: 'matriz-m3', matriz_n3: 'matriz-n3', matriz_n3_4: 'matriz-n3_4', matriz_v3: 'matriz-v3',
+          matriz_m4: 'matriz-m4', matriz_n4_1: 'matriz-n4_1', matriz_n4_4: 'matriz-n4_4', matriz_v4: 'matriz-v4',
+          item4: 'item-4', item5: 'item-5'
+        };
+        // Saneo: solo claves conocidas y solo strings
+        Object.keys(fieldMap).forEach(key => {
+          if (typeof data[key] === 'string') {
+            const el = document.getElementById(fieldMap[key]);
+            if (el) el.value = data[key];
+          }
+        });
+      } catch (e) {
+        console.error("Error al restaurar LocalStorage", e);
+        showToast("⚠️ El autoguardado local está dañado; se ignoró.", "warning");
+      }
+    }
+
+    function downloadBackup() {
+      const data = getFormData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Respaldo_${data.actividad_id}_${data.estudiante_codigo || 'Estudiante'}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast("💾 Respaldo JSON descargado.", "info", 3500);
+    }
+
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = JSON.parse(e.target.result);
+          // Validación dura: solo respaldos de ESTA actividad
+          if (data.actividad_id !== ACTIVIDAD_ID_ESPERADA) {
+            showToast(`❌ Respaldo rechazado: pertenece a "${escapeHtml(String(data.actividad_id || 'ID desconocido'))}" y esta actividad es "${ACTIVIDAD_ID_ESPERADA}".`, "error", 8000);
+            event.target.value = '';
+            return;
+          }
+          // Saneo: solo claves conocidas y de tipo string
+          const clean = { actividad_id: ACTIVIDAD_ID_ESPERADA, materia: "Administración 4.0" };
+          const knownKeys = ['grupo','participantes','estudiante_codigo','estudiante_programa',
+            'item1_h1','item1_h2','item1_url','item1','item2_area','item2_url','item2',
+            'item3_c1','item3_c2','item3_c3','item3',
+            'matriz_m1','matriz_n1','matriz_n4','matriz_v1','matriz_m2','matriz_n2','matriz_n2_4','matriz_v2',
+            'matriz_m3','matriz_n3','matriz_n3_4','matriz_v3','matriz_m4','matriz_n4_1','matriz_n4_4','matriz_v4',
+            'item4','item5'];
+          knownKeys.forEach(k => { if (typeof data[k] === 'string') clean[k] = data[k]; });
+
+          // Cargar un respaldo INVALIDA cualquier transmisión anterior (el candado solo
+          // se restaura si el contenido cargado coincide con el hash del respaldo)
+          const hashRespaldo = (typeof data.hash === 'string') ? data.hash : null;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
+          loadFromLocalStorage();
+          updateProgressBar();
+
+          if (data.transmitted === "true" && hashRespaldo && computeHash() === hashRespaldo) {
+            datosTransmitidos = true;
+            lastTransmittedHash = hashRespaldo;
+            markTransmittedUI();
+            unlockPdfButton();
+            saveToLocalStorage();
+            showToast("✅ Respaldo JSON cargado: contiene la misma versión ya transmitida (PDF habilitado).", "success", 6000);
+          } else {
+            datosTransmitidos = false;
+            lastTransmittedHash = null;
+            lockPdfButton();
+            markNotTransmittedUI();
+            saveToLocalStorage();
+            showToast("✅ Respaldo JSON cargado. Como su contenido puede diferir del último envío, debes volver a transmitir.", "warning", 7000);
+          }
+        } catch (err) {
+          showToast("❌ El archivo no posee un formato JSON válido.", "error");
+        }
+        event.target.value = ''; // permite recargar el mismo archivo
+      };
+      reader.readAsText(file);
+    }
+
+    const sendData = async () => {
+      const check = validateRequiredFields();
+      if (!check.ok) {
+        showToast(check.msg, "warning", 7000);
+        return;
+      }
+
+      const btnSend = document.getElementById('btn-enviar-trabajo');
+      btnSend.disabled = true;
+      btnSend.innerHTML = `<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> Transmitiendo al Servidor...`;
+      lucide.createIcons();
+
+      try {
+        const payload = getFormData();
+        payload.estado = "Entregado";
+        payload.fecha_registro = new Date().toLocaleString(); // fecha del envío real, no del primer guardado
+        payload.transmitted = "true";
+        payload.hash = computeHash();
+
+        await fetch(WEBHOOK_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload)
+        });
+
+        datosTransmitidos = true;
+        lastTransmittedHash = payload.hash;
+        saveToLocalStorage();
+        markTransmittedUI();
+        unlockPdfButton();
+
+        showToast("✅ Transmisión completada. El navegador no puede confirmar el servidor con no-cors; si el docente no ve tu fila, reintenta. Ya puedes exportar el PDF.", "success", 8000);
+      } catch (error) {
+        console.error("Error al transmitir", error);
+        // El catch solo se alcanza si falló la CONEXIÓN: el servidor NO recibió nada.
+        showToast("❌ Falló la conexión: el servidor NO recibió tus datos. Revisa tu internet y reintenta, o usa el respaldo JSON como evidencia local.", "error", 9000);
+        btnSend.disabled = false;
+        btnSend.innerHTML = `<i data-lucide="check-circle" class="w-5 h-5"></i> Reintentar Enviar Trabajo`;
+      }
+      lucide.createIcons();
+    };
+
+    function escapeHtml(str) {
+      return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function openPreview() {
+      if (!datosTransmitidos) {
+        showToast("⛔ Acción bloqueada: Primero presiona 'Enviar Trabajo' para registrar tus respuestas.", "warning", 6000);
+        return;
+      }
+      // Doble candado: el PDF solo abre si el contenido sigue siendo el transmitido
+      if (computeHash() !== lastTransmittedHash) {
+        datosTransmitidos = false;
+        lockPdfButton();
+        markNotTransmittedUI();
+        showToast("⛔ El contenido cambió después del envío. Vuelve a transmitir antes de exportar el PDF.", "warning", 7000);
+        return;
+      }
+
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        showToast("⛔ Tu navegador bloqueó la ventana emergente. Permite ventanas emergentes para esta página e inténtalo de nuevo.", "error", 8000);
+        return;
+      }
+
+      const data = getFormData();
+
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Reporte de Entregable - ${escapeHtml(data.actividad_id)}</title>
+          <style>
+            @page { size: letter; margin: 12mm; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; padding: 20px; line-height: 1.4; font-size: 11px; word-break: break-word; overflow-wrap: anywhere; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .header-print { border-bottom: 3px solid #002060; padding-bottom: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+            .title { color: #002060; font-size: 16px; font-weight: bold; text-transform: uppercase; margin: 0; }
+            .subtitle { color: #00C2FF; font-size: 11px; font-weight: bold; margin-top: 2px; }
+            .section { margin-bottom: 15px; page-break-inside: auto; }
+            .section-title { font-size: 12px; font-weight: bold; color: #002060; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; margin-bottom: 6px; text-transform: uppercase; }
+            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+            .box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 6px; }
+            .label { font-weight: bold; font-size: 9px; color: #64748b; text-transform: uppercase; display: block; }
+            .val { font-size: 10.5px; color: #0f172a; margin-top: 2px; white-space: pre-wrap; }
+            table { width: 100%; border-collapse: collapse; font-size: 9.5px; margin-top: 6px; page-break-inside: auto; }
+            tr { page-break-inside: avoid; }
+            th, td { border: 1px solid #cbd5e1; padding: 5px; text-align: left; vertical-align: top; }
+            th { background-color: #002060; color: white; text-transform: uppercase; }
+            .btn-print { background: #002060; color: white; border: none; padding: 8px 16px; font-weight: bold; border-radius: 4px; cursor: pointer; margin-bottom: 15px; font-size: 11px; }
+            @media (max-width: 600px) {
+              body { padding: 12px; }
+              .grid { grid-template-columns: 1fr; }
+              .header-print { flex-direction: column; align-items: flex-start; gap: 6px; }
+            }
+            @media print {
+              .no-print { display: none !important; }
+              body { padding: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="no-print">
+            <button class="btn-print" onclick="window.print()">🖨️ Imprimir o Guardar como PDF</button>
+          </div>
+
+          <div class="header-print">
+            <div>
+              <h1 class="title">Politécnico Grancolombiano</h1>
+              <div class="subtitle">Reporte de Investigación Agéntica: El Auxiliar Administrativo 4.0</div>
+            </div>
+            <div style="text-align: right; font-size: 9px; color: #64748b;">
+              <strong>ID:</strong> ${escapeHtml(data.actividad_id)}<br>
+              <strong>Fecha:</strong> ${escapeHtml(data.fecha_registro)}
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">1. Datos del Estudiante</div>
+            <div class="grid">
+              <div class="box"><span class="label">Estudiante:</span><div class="val">${escapeHtml(data.participantes)}</div></div>
+              <div class="box"><span class="label">Código Estudiantil:</span><div class="val">${escapeHtml(data.estudiante_codigo)}</div></div>
+              <div class="box"><span class="label">Programa Académico:</span><div class="val">${escapeHtml(data.estudiante_programa)}</div></div>
+              <div class="box"><span class="label">Grupo / Materia:</span><div class="val">${escapeHtml(data.grupo)} | ${escapeHtml(data.materia)}</div></div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">2. Rastreo de Fuentes Externas</div>
+            <p style="margin:4px 0;"><strong>Eje 1 Herramientas:</strong> ${escapeHtml(data.item1_h1)}, ${escapeHtml(data.item1_h2)} | <strong>Fuente:</strong> ${escapeHtml(data.item1_url)}</p>
+            <div class="box" style="margin-bottom:6px;"><span class="label">Descripción Eje 1:</span><div class="val">${escapeHtml(data.item1)}</div></div>
+
+            <p style="margin:4px 0;"><strong>Eje 2 Área:</strong> ${escapeHtml(data.item2_area)} | <strong>Fuente:</strong> ${escapeHtml(data.item2_url)}</p>
+            <div class="box" style="margin-bottom:6px;"><span class="label">Resumen Caso Reales:</span><div class="val">${escapeHtml(data.item2)}</div></div>
+
+            <p style="margin:4px 0;"><strong>Eje 3 Competencias:</strong> ${escapeHtml(data.item3_c1)}, ${escapeHtml(data.item3_c2)}, ${escapeHtml(data.item3_c3)}</p>
+            <div class="box"><span class="label">Análisis de Mercado:</span><div class="val">${escapeHtml(data.item3)}</div></div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">3. Matriz de Transformación (4 Filas)</div>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:25%;">Tarea Manual</th>
+                  <th style="width:25%;">Solución N1</th>
+                  <th style="width:25%;">Solución N4 Agéntica</th>
+                  <th style="width:25%;">Nuevo Rol</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>${escapeHtml(data.matriz_m1)}</td><td>${escapeHtml(data.matriz_n1)}</td><td>${escapeHtml(data.matriz_n4)}</td><td>${escapeHtml(data.matriz_v1)}</td></tr>
+                <tr><td>${escapeHtml(data.matriz_m2)}</td><td>${escapeHtml(data.matriz_n2)}</td><td>${escapeHtml(data.matriz_n2_4)}</td><td>${escapeHtml(data.matriz_v2)}</td></tr>
+                <tr><td>${escapeHtml(data.matriz_m3)}</td><td>${escapeHtml(data.matriz_n3)}</td><td>${escapeHtml(data.matriz_n3_4)}</td><td>${escapeHtml(data.matriz_v3)}</td></tr>
+                <tr><td>${escapeHtml(data.matriz_m4)}</td><td>${escapeHtml(data.matriz_n4_1)}</td><td>${escapeHtml(data.matriz_n4_4)}</td><td>${escapeHtml(data.matriz_v4)}</td></tr>
+              </tbody>
+            </table>
+            <div class="box" style="margin-top:6px;"><span class="label">Síntesis Integradora:</span><div class="val">${escapeHtml(data.item4)}</div></div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">4. Gobernanza de Datos & Ley 1581</div>
+            <div class="box"><span class="label">Análisis Habeas Data:</span><div class="val">${escapeHtml(data.item5)}</div></div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">5. Criterios Evaluativos de Referencia</div>
+            <table>
+              <thead>
+                <tr><th>Criterio</th><th>Aceptable</th><th>Excelente</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>1. Rigor de Fuentes</td><td>Identifica herramientas y casos generales.</td><td>URLs verificables, herramientas N4 y casos reales 2025/2026.</td></tr>
+                <tr><td>2. Escalera Agéntica</td><td>Diferencia chat de automatización.</td><td>Modela con precisión flujos agénticos N4.</td></tr>
+                <tr><td>3. Matriz de Impacto</td><td>Conecta tareas con IA.</td><td>Define su rol como supervisor de reglas.</td></tr>
+                <tr><td>4. Ética (Ley 1581)</td><td>Menciona Ley 1581 general.</td><td>Analiza riesgos específicos de datos en RAG/API.</td></tr>
+                <tr><td>5. Transmisión Integrada</td><td>Reporte parcial sin respaldo.</td><td>Transmite al servidor docente y exporta PDF completo.</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div style="margin-top: 15px; border-top: 1px solid #cbd5e1; padding-top: 6px; font-size: 8.5px; color: #94a3b8; text-align: center;">
+            Estado de transmisión al servidor docente: <strong>REGISTRADO & ENVIADO</strong>
+          </div>
+        </body>
+        </html>
+      `;
+
+      printWindow.document.open();
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+    }
+  </script>
+</body>
+</html>
